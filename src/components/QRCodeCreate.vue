@@ -29,6 +29,7 @@ import { processCsvDataForBatch, generateBatchExportFilename } from '@/utils/csv
 import { getNumericCSSValue } from '@/utils/formatting'
 import { allQrCodePresets, defaultPreset, type Preset } from '@/utils/qrCodePresets'
 import { allFramePresets, defaultFramePreset, type FramePreset } from '@/utils/framePresets'
+import type { FrameKey } from '@/components/frames'
 import { useMediaQuery } from '@vueuse/core'
 import JSZip from 'jszip'
 import {
@@ -303,6 +304,7 @@ const recommendedErrorCorrectionLevel = computed<ErrorCorrectionLevel | null>(()
 const defaultFrameText = computed(() => t('Scan for more info'))
 const frameText = ref<string>('')
 const frameTextPosition = ref<'top' | 'bottom' | 'left' | 'right'>('bottom')
+const frameType = ref<FrameKey>('none')
 const showFrame = ref(false)
 
 //#region /* Default QR code text */
@@ -337,6 +339,7 @@ function applyFramePreset(preset: FramePreset) {
   }
   if (preset.text) frameText.value = preset.text
   if (preset.position) frameTextPosition.value = preset.position
+  if (preset.type) frameType.value = preset.type
 }
 
 watch(
@@ -539,6 +542,7 @@ interface QRCodeConfig {
     text: string
     position: 'top' | 'bottom' | 'left' | 'right'
     style: FrameStyle
+    type: FrameKey
   } | null
 }
 
@@ -546,7 +550,12 @@ function createQrConfig(): QRCodeConfig {
   return {
     props: qrCodeProps.value,
     style: style.value,
-    frame: showFrame.value ? frameSettings.value : null
+    frame: showFrame.value
+      ? {
+          ...frameSettings.value,
+          type: frameType.value
+        }
+      : null
   }
 }
 
@@ -590,18 +599,21 @@ function loadQRConfig(jsonString: string, key?: string) {
   selectedPreset.value = preset
 
   if (frameConfig) {
+    const typedFrame = frameConfig
     showFrame.value = true
-    frameText.value = frameConfig.text || defaultFrameText.value
-    frameTextPosition.value = frameConfig.position || 'bottom'
+    frameText.value = typedFrame.text || defaultFrameText.value
+    frameTextPosition.value = typedFrame.position || 'bottom'
+    frameType.value = typedFrame.type || 'none'
     frameStyle.value = {
       ...frameStyle.value,
-      ...frameConfig.style
+      ...typedFrame.style
     }
     framePreset = {
       name: key || LAST_LOADED_LOCALLY_PRESET_KEY,
-      style: frameConfig.style,
-      text: frameConfig.text,
-      position: frameConfig.position
+      style: typedFrame.style,
+      text: typedFrame.text,
+      position: typedFrame.position,
+      type: typedFrame.type
     }
   }
 
@@ -797,7 +809,7 @@ const onBatchInputFileUpload = (event: Event) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const usedFilenames = new Set() // zip folders cannot have duplicate filenames, otherwise they override each other
+const usedFilenames = new Set<string>() // zip folders cannot have duplicate filenames, otherwise they override each other
 const createZipFile = (
   zip: typeof JSZip,
   dataUrl: string,
@@ -963,6 +975,7 @@ const mainDivPaddingStyle = computed(() => {
                 :frame-text="frameText"
                 :text-position="frameTextPosition"
                 :frame-style="frameStyle"
+                :frame-type="frameType"
               >
                 <template #qr-code>
                   <div id="qr-code-container" class="grid place-items-center">
@@ -1065,6 +1078,7 @@ const mainDivPaddingStyle = computed(() => {
               :frame-text="frameText"
               :text-position="frameTextPosition"
               :frame-style="frameStyle"
+              :frame-type="frameType"
             >
               <template #qr-code>
                 <div id="qr-code-container" class="grid place-items-center">
